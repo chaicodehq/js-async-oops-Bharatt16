@@ -4,7 +4,7 @@
  * Zomato ki delivery pipeline banana hai jahan order placement se lekar
  * delivery tak sab kuch Promise chaining se hoga. Har step ek Promise
  * return karta hai aur .then() se next step chain hota hai. Agar koi
- * step fail ho toh .catch() se error handle karo.
+ * step fail ho toh .catch() se Error handle karo.
  *
  * Pipeline: placeOrder -> confirmOrder -> assignRider -> deliverOrder
  *
@@ -45,10 +45,10 @@
  *       .then(order => confirmOrder(order))
  *       .then(order => assignRider(order))
  *       .then(order => deliverOrder(order))
- *       .catch(error => ({ error: error.message, status: "failed" }))
+ *       .catch(Error => ({ Error: Error.message, status: "failed" }))
  *   - Returns the Promise chain
  *   - On success: final delivered order object
- *   - On failure: { error: message, status: "failed" }
+ *   - On failure: { Error: message, status: "failed" }
  *
  * Function: processMultipleOrders(orderList)
  *   - Takes array of { restaurant, items } objects
@@ -60,7 +60,7 @@
  * Rules:
  *   - Each function returns a new Promise
  *   - Use .then() for chaining, NOT async/await
- *   - processDelivery must use .catch() for error handling
+ *   - processDelivery must use .catch() for Error handling
  *   - Order flows through a strict pipeline: placed -> confirmed -> assigned -> delivered
  *   - Each step validates the previous step's status
  *   - Random rider selection from the given pool
@@ -82,28 +82,92 @@
  *     { restaurant: "", items: [] }  // invalid
  *   ]);
  *   // => [ { status: "fulfilled", value: { ...delivered order } },
- *   //      { status: "fulfilled", value: { error: "Invalid order details!", status: "failed" } } ]
+ *   //      { status: "fulfilled", value: { Error: "Invalid order details!", status: "failed" } } ]
  */
+const riders = ["Rahul", "Priya", "Amit", "Neha", "Vikram"];
+
 export function placeOrder(restaurant, items) {
-  // Your code here
+  return new Promise((resolve, reject) => {
+    if (
+      typeof restaurant !== "string" ||
+      restaurant.length === 0 ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return reject(new Error("Invalid order details!"));
+    }
+
+    setTimeout(() => {
+      resolve({
+        orderId: Math.floor(Math.random() * 10000),
+        restaurant,
+        items,
+        status: "placed",
+        timestamp: new Date().toISOString()
+      });
+    }, 50);
+  });
 }
 
 export function confirmOrder(order) {
-  // Your code here
+  return new Promise((resolve, reject) => {
+    if (!order || !order.orderId || order.status !== "placed") {
+      return reject(new Error("Order cannot be confirmed!"));
+    }
+
+    resolve({
+      ...order,
+      status: "confirmed",
+      estimatedTime: 30
+    });
+  });
 }
 
 export function assignRider(order) {
-  // Your code here
+  return new Promise((resolve, reject) => {
+    if (!order || order.status !== "confirmed") {
+      return reject(new Error("Order not confirmed yet!"));
+    }
+
+    const randomRider = riders[Math.floor(Math.random() * riders.length)];
+
+    resolve({
+      ...order,
+      rider: randomRider,
+      status: "assigned"
+    });
+  });
 }
 
 export function deliverOrder(order) {
-  // Your code here
+  return new Promise((resolve, reject) => {
+    if (!order || order.status !== "assigned" || !order.rider) {
+      return reject(new Error("No rider assigned!"));
+    }
+
+    resolve({
+      ...order,
+      status: "delivered",
+      deliveredAt: new Date().toISOString()
+    });
+  });
 }
 
 export function processDelivery(restaurant, items) {
-  // Your code here
+  return placeOrder(restaurant, items)
+    .then(order => confirmOrder(order))
+    .then(order => assignRider(order))
+    .then(order => deliverOrder(order))
+    .catch(error => ({
+      error: error.message,
+      status: "failed"
+    }));
 }
 
 export function processMultipleOrders(orderList) {
-  // Your code here
+  const promises = orderList.map(order =>
+    processDelivery(order.restaurant, order.items)
+  );
+
+  return Promise.allSettled(promises);
 }
